@@ -1,0 +1,83 @@
+
+# Ahora vamos a validar los resultados del CENSO 2010
+censo2010 <- "./00data/RESAGEBURB_09XLS10.xls"
+
+# Aqui sólo leo la primera hoja... y veo que efectivamente sólo llego hasta el municipio 014
+# censo2010 <- read_xls(censo2010)
+# unique(censo2010$MUN)
+
+# Cuantas hojas tengo, y como se llaman
+readxl::excel_sheets(censo2010)
+
+censo2010 <- rbind(
+  readxl::read_xls(censo2010, sheet = readxl::excel_sheets(censo2010)[1]), 
+  readxl::read_xls(censo2010, sheet = readxl::excel_sheets(censo2010)[2]))
+
+# Listo, ya tengo todos mis municipios
+unique(censo2010$MUN)
+
+str(censo2010$POBTOT)
+
+censo2010$POBTOT<- as.numeric(censo2010$POBTOT)
+censo2010$P_3A5<- as.numeric(censo2010$P_3A5)
+censo2010$P_3A5_M<- as.numeric(censo2010$P_3A5_M)
+censo2010$P_3A5_F<- as.numeric(censo2010$P_3A5_F)
+censo2010$P_6A11<- as.numeric(censo2010$P_6A11)
+censo2010$P_6A11_M<- as.numeric(censo2010$P_6A11_M)
+censo2010$P_6A11_F<- as.numeric(censo2010$P_6A11_F)
+
+sum(censo2010$POBTOT)
+
+#Geografia de INEGI: página 12
+# http://www.beta.inegi.org.mx/contenidos/temas/mapas/mg/metadatos/manual_cartografia_censal.pdf
+
+# Los totales son 0000.
+# Por ejemplo: Este es mi total de población
+# Además inician con la palabra "Total"
+
+# Sabiendo esto...como puedo limpiar mi tabla? Guardar la nueva tabla como censo2010_b
+
+View(censo2010)
+
+censo2010_b <- censo2010 %>% 
+  filter(!grepl(pattern = "Total", x = censo2010$NOM_LOC))
+
+View(censo2010)
+
+sum(censo2010_b$POBTOT)
+
+# Ahora si, tengo todo lo urbano de la CDMX. La pregunta es ¿dónde quedó lo rural? No está en este archivo...
+
+# Población Rural:
+censo2010 %>% 
+  filter(MUN=="000") %>% 
+  select(POBTOT) - sum(censo2010_b$POBTOT)
+
+# Listo. Tengo validado mi data frame de censo2010. Limpio mis nombres y elimino para liberar memoria.
+censo2010 <- censo2010_b
+rm(censo2010_b)
+
+# Construir la CVEGEO completa a nivel AGEB ( ENTIDAD, MUNICIPIO, LOCALIDAD, AGEB) del CENSO2010, ----
+# seleccionar solo las columnas de CVEGEO y POBTOT, y agrupo por mi clave AGEB (para tener la población de 2010 por cada AGEB)
+# y sumar mi total de población
+
+censo2010 <- censo2010 %>% 
+  mutate(CVEGEO = paste0(ENTIDAD, MUN, LOC, AGEB)) %>% 
+  dplyr::select(CVEGEO, POBTOT,P_3A5,P_3A5_M,P_3A5_F,P_6A11,
+                P_6A11_M,P_6A11_F) %>% 
+  group_by(CVEGEO) %>% 
+  summarise(POBTOT = sum(POBTOT),
+            P_3A5 = sum(P_3A5),
+            P_3A5_M = sum(P_3A5_M),
+            P_3A5_F = sum(P_3A5_F),
+            P_6A11 = sum(P_6A11),
+            P_6A11_M = sum(P_6A11_M),
+            P_6A11_F = sum(P_6A11_F))
+
+
+write.csv(censo2010, "censo2010.csv")
+
+sum(censo2010$POBTOT)
+
+View(censo2010)
+
